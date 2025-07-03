@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Priority Board - Kanban Task Manager</title>
+    
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Lucide Icons for icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        /* Custom styles to match React app nuances */
+        body {
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        /* Custom animation for install prompt pulse */
+        @keyframes pulse-bg {
+            0%, 100% { background-color: rgba(167, 243, 208, 1); }
+            50% { background-color: rgba(110, 231, 183, 1); }
+        }
+        .animate-pulse-bg {
+            animation: pulse-bg 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50 p-6 relative">
+
+    <!-- Task Card Template (View Mode) -->
+    <template id="task-card-template">
+        <div class="task-card bg-white rounded-xl shadow-sm border-2 border-gray-100 p-4 mb-3 cursor-move hover:shadow-lg transition-all duration-300 group" draggable="true">
+            <!-- Task View Header -->
+            <div class="flex items-start justify-between mb-3">
+                <div class="flex items-center gap-2">
+                    <span class="task-category px-3 py-1 rounded-full text-xs font-bold tracking-wide border"></span>
+                    <span class="task-priority-icon text-sm"></span>
+                </div>
+                <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button type="button" class="edit-task-btn text-gray-400 hover:text-blue-600 p-1 rounded hover:bg-blue-50 transition-all" title="Edit Task">
+                        <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
+                    </button>
+                    <button type="button" class="archive-task-btn text-gray-400 hover:text-green-600 p-1 rounded hover:bg-green-50 transition-all" title="Archive Task">
+                        <i data-lucide="archive" class="w-3.5 h-3.5"></i>
+                    </button>
+                    <button type="button" class="delete-task-btn text-gray-400 hover:text-red-600 p-1 rounded hover:bg-red-50 transition-all" title="Delete Task">
+                        <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Task Content -->
+            <div class="task-content-view cursor-pointer">
+                <h3 class="task-title font-bold text-gray-800 mb-2 leading-tight text-lg group-hover:text-blue-600 transition-colors"></h3>
+                <p class="task-description text-sm text-gray-600 mb-3 leading-relaxed font-light"></p>
+                <div class="task-due-date flex items-center gap-1 text-xs text-gray-500">
+                    <i data-lucide="calendar" class="w-3 h-3"></i>
+                    <span class="due-date-text"></span>
+                    <i data-lucide="alert-circle" class="w-3 h-3 overdue-indicator hidden"></i>
+                </div>
+            </div>
+        </div>
+    </template>
+    
+    <!-- Task Card Template (Edit Mode) -->
+    <template id="task-edit-form-template">
+        <div class="task-edit-form bg-white rounded-xl shadow-lg border-2 border-blue-400 p-6 mb-4">
+            <div class="space-y-4">
+                <!-- Header -->
+                <div class="flex items-center justify-between pb-3 border-b border-gray-100">
+                    <h4 class="font-bold text-gray-700 text-sm uppercase tracking-wide">Edit Task</h4>
+                    <button type="button" class="cancel-edit-btn text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 transition-all">
+                        <i data-lucide="x" class="w-4 h-4"></i>
+                    </button>
+                </div>
+                <!-- Title -->
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wide">Task Title</label>
+                    <input type="text" class="edit-title w-full text-base font-bold bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" placeholder="Enter task title...">
+                </div>
+                <!-- Description -->
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wide">Description</label>
+                    <textarea class="edit-description w-full text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all resize-none" rows="3" placeholder="Add task description..."></textarea>
+                </div>
+                <!-- Category and Priority -->
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wide">Category</label>
+                        <select class="edit-category w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"></select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wide">Priority</label>
+                        <select class="edit-priority w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"></select>
+                    </div>
+                </div>
+                <!-- Due Date -->
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wide">Due Date</label>
+                    <input type="date" class="edit-due-date w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
+                </div>
+                <!-- Action Buttons -->
+                <div class="flex gap-2 pt-3 border-t border-gray-100">
+                    <button type="button" class="save-task-btn flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition-all transform hover:scale-105 active:scale-95">Save Changes</button>
+                    <button type="button" class="delete-task-btn-edit bg-red-100 hover:bg-red-200 text-red-600 font-semibold py-2 px-4 rounded-lg transition-all">Delete</button>
+                </div>
+            </div>
+        </div>
+    </template>
+    
+    <div id="app-container" class="relative">
+        <!-- Header -->
+        <header class="mb-8">
+            <h1 class="text-6xl font-black text-gray-800 mb-3 tracking-tight bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                Priority Board
+            </h1>
+            <p class="text-xl text-gray-600 font-light italic tracking-wide">
+                Your command center for everything that matters ✨
+            </p>
+        </header>
+
+        <!-- Controls -->
+        <div class="mb-8 bg-white/80 backdrop-blur-md rounded-2xl p-6 shadow-lg border border-white/50 relative z-10">
+            <div class="flex flex-wrap gap-4 items-center">
+                <div class="flex items-center gap-3 bg-white rounded-xl px-4 py-3 shadow-sm border border-gray-100 hover:shadow-md transition-all">
+                    <i data-lucide="search" class="w-4.5 h-4.5 text-gray-400"></i>
+                    <input id="search-input" type="text" placeholder="Search your universe..." class="bg-transparent outline-none text-sm font-medium placeholder-gray-400 w-64">
+                </div>
+
+                <select id="filter-category" class="min-w-48 bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm font-medium hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"></select>
+                <select id="filter-priority" class="min-w-44 bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm font-medium hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"></select>
+
+                <button id="toggle-archived-btn" type="button" class="flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-semibold transition-all transform hover:scale-105 bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-200">
+                    <i data-lucide="archive" class="w-4 h-4"></i>
+                    <span id="toggle-archived-text">Show Archived</span>
+                </button>
+
+                <button id="install-pwa-btn" type="button" class="hidden flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-semibold bg-green-100 text-green-700 border border-green-200 transition-all transform hover:scale-105 animate-pulse-bg">
+                    <i data-lucide="download" class="w-4 h-4"></i>
+                    Install App
+                </button>
+            </div>
+        </div>
+
+        <!-- Kanban Board -->
+        <div id="kanban-board" class="flex gap-6 overflow-x-auto pb-4 relative z-0">
+            <!-- Columns will be injected here by JavaScript -->
+        </div>
+
+        <!-- Stats Footer -->
+        <footer class="mt-8 bg-white/80 backdrop-blur-md rounded-2xl p-6 shadow-lg border border-white/50 relative z-10">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
+                <div class="group hover:scale-105 transition-transform">
+                    <div id="stats-total" class="text-3xl font-black text-blue-600 mb-1">0</div>
+                    <div class="text-xs uppercase tracking-widest text-gray-500 font-bold">Total Active</div>
+                </div>
+                <div class="group hover:scale-105 transition-transform">
+                    <div id="stats-completed" class="text-3xl font-black text-green-600 mb-1">0</div>
+                    <div class="text-xs uppercase tracking-widest text-gray-500 font-bold">Completed</div>
+                </div>
+                <div class="group hover:scale-105 transition-transform">
+                    <div id="stats-today" class="text-3xl font-black text-amber-600 mb-1">0</div>
+                    <div class="text-xs uppercase tracking-widest text-gray-500 font-bold">Today's Focus</div>
+                </div>
+                <div class="group hover:scale-105 transition-transform">
+                    <div id="stats-archived" class="text-3xl font-black text-purple-600 mb-1">0</div>
+                    <div class="text-xs uppercase tracking-widest text-gray-500 font-bold">Archived</div>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+
+    // --- DATA & STATE ---
+    
+    let state = {
+        tasks: [],
+        searchTerm: '',
+        filterCategory: 'all',
+        filterPriority: 'all',
+        showArchived: false,
+        deferredPrompt: null
+    };
+
+    const columns = [
+        { id: 'backlog', title: 'Backlog', icon: '📋', color: 'bg-slate-50 border-slate-200' },
+        { id: 'today', title: 'Today', icon: '🎯', color: 'bg-blue-50 border-blue-200' },
+        { id: 'inProgress', title: 'In Progress', icon: '⚡', color: 'bg-amber-50 border-amber-200' },
+        { id: 'waiting', title: 'Waiting', icon: '⏳', color: 'bg-purple-50 border-purple-200' },
+        { id: 'done', title: 'Done', icon: '✅', color: 'bg-green-50 border-green-200' }
+    ];
+
+    const categories = [
+        { id: 'work', label: 'Work', color: 'bg-blue-100 text-blue-700 border-blue-200', emoji: '💼' },
+        { id: 'personal', label: 'Personal', color: 'bg-emerald-100 text-emerald-700 border-emerald-200', emoji: '🏠' },
+        { id: 'goals', label: 'Goals', color: 'bg-purple-100 text-purple-700 border-purple-200', emoji: '🎯' },
+        { id: 'daily', label: 'Daily', color: 'bg-orange-100 text-orange-700 border-orange-200', emoji: '📅' }
+    ];
+
+    const priorities = [
+        { id: 'high', label: 'High', color: 'border-l-4 border-red-400 bg-red-50', icon: '🔴' },
+        { id: 'medium', label: 'Medium', color: 'border-l-4 border-yellow-400 bg-yellow-50', icon: '🟡' },
+        { id: 'low', label: 'Low', color: 'border-l-4 border-green-400 bg-green-50', icon: '🟢' }
+    ];
+
+    // --- DOM ELEMENT REFERENCES ---
+
+    const kanbanBoard = document.getElementById('kanban-board');
+    const searchInput = document.getElementById('search-input');
+    const filterCategorySelect = document.getElementById('filter-category');
+    const filterPrioritySelect = document.getElementById('filter-priority');
+    const toggleArchivedBtn = document.getElementById('toggle-archived-btn');
+    const installPwaBtn = document.getElementById('install-pwa-btn');
+
+    // Templates
+    const taskCardTemplate = document.getElementById('task-card-template');
+    const taskEditFormTemplate = document.getElementById('task-edit-form-template');
+
+    // --- CORE FUNCTIONS ---
+
+    const saveTasks = () => {
+        localStorage.setItem('kanban-tasks', JSON.stringify(state.tasks));
+    };
+
+    const loadTasks = () => {
+        const savedTasks = localStorage.getItem('kanban-tasks');
+        state.tasks = savedTasks ? JSON.parse(savedTasks) : [];
+    };
+
+    const addTask = (columnId) => {
+        const newTask = {
+            id: Date.now().toString(),
+            title: 'New Task',
+            description: '',
+            column: columnId,
+            category: 'work',
+            priority: 'medium',
+            dueDate: '',
+            createdAt: new Date().toISOString(),
+            archived: false,
+            isEditing: false
+        };
+        state.tasks.push(newTask);
+        saveAndRender();
+    };
+    
+    const updateTask = (taskId, updates) => {
+        state.tasks = state.tasks.map(task =>
+            task.id === taskId ? { ...task, ...updates } : task
+        );
+        saveAndRender();
+    };
+
+    const deleteTask = (taskId) => {
+        state.tasks = state.tasks.filter(task => task.id !== taskId);
+        saveAndRender();
+    };
+
+    const archiveTask = (taskId) => {
+        updateTask(taskId, { archived: true });
+    };
+
+    // --- RENDERING ---
+
+    const saveAndRender = () => {
+        saveTasks();
+        render();
+    };
+
+    const render = () => {
+        kanbanBoard.innerHTML = ''; // Clear the board
+
+        // Filter tasks
+        const filteredTasks = state.tasks.filter(task => {
+            if (state.showArchived !== task.archived) return false;
+            if (state.filterCategory !== 'all' && task.category !== state.filterCategory) return false;
+            if (state.filterPriority !== 'all' && task.priority !== state.filterPriority) return false;
+            if (state.searchTerm && 
+                !task.title.toLowerCase().includes(state.searchTerm.toLowerCase()) && 
+                !task.description.toLowerCase().includes(state.searchTerm.toLowerCase())) return false;
+            return true;
+        });
+
+        columns.forEach(column => {
+            const columnEl = createColumnElement(column, filteredTasks);
+            kanbanBoard.appendChild(columnEl);
+        });
+
+        updateStats();
+        updateControls();
+        lucide.createIcons(); // Re-render icons after DOM changes
+    };
+    
+    const createColumnElement = (column, allFilteredTasks) => {
+        const columnEl = document.createElement('div');
+        columnEl.className = `${column.color} rounded-2xl p-5 min-h-96 shadow-lg backdrop-blur-sm border-2 transition-all hover:shadow-xl relative flex-shrink-0 w-80`;
+        columnEl.dataset.columnId = column.id;
+        
+        // Drag and drop listeners
+        columnEl.addEventListener('dragover', e => e.preventDefault());
+        columnEl.addEventListener('drop', (e) => {
+            e.preventDefault();
+            const taskId = e.dataTransfer.getData('text/plain');
+            updateTask(taskId, { column: column.id, isEditing: false });
+        });
+
+        const tasksInColumn = allFilteredTasks.filter(t => t.column === column.id);
+
+        columnEl.innerHTML = `
+            <div class="flex items-center justify-between mb-6">
+              <div class="flex items-center gap-3">
+                <span class="text-3xl">${column.icon}</span>
+                <h2 class="text-2xl font-black text-gray-800 tracking-wide">${column.title}</h2>
+              </div>
+              <div class="flex items-center gap-3">
+                <span class="bg-white/90 text-gray-700 px-3 py-1 rounded-full text-sm font-bold shadow-sm">${tasksInColumn.length}</span>
+                <button type="button" class="add-task-btn bg-white/90 hover:bg-white text-gray-600 hover:text-gray-800 p-3 rounded-xl transition-all shadow-sm hover:shadow-md transform hover:scale-110 active:scale-95">
+                  <i data-lucide="plus" class="w-4.5 h-4.5"></i>
+                </button>
+              </div>
+            </div>
+            <div class="task-list space-y-4"></div>
+        `;
+        
+        const taskListEl = columnEl.querySelector('.task-list');
+        
+        if (tasksInColumn.length === 0) {
+            taskListEl.innerHTML = `
+                <div class="text-center py-16 text-gray-400">
+                  <div class="text-5xl mb-4 opacity-30">${column.icon}</div>
+                  <p class="text-sm font-medium italic">Drop tasks here or click + to add</p>
+                </div>`;
+        } else {
+            tasksInColumn.forEach(task => {
+                const cardContainer = document.createElement('div');
+                cardContainer.dataset.taskId = task.id;
+                
+                const cardEl = task.isEditing 
+                    ? createTaskEditFormElement(task) 
+                    : createTaskCardElement(task);
+                
+                cardContainer.appendChild(cardEl);
+                taskListEl.appendChild(cardContainer);
+            });
+        }
+        
+        columnEl.querySelector('.add-task-btn').addEventListener('click', () => addTask(column.id));
+
+        return columnEl;
+    };
+    
+    const createTaskCardElement = (task) => {
+        const cardNode = taskCardTemplate.content.cloneNode(true);
+        const cardEl = cardNode.querySelector('.task-card');
+        
+        const category = categories.find(c => c.id === task.category) || {};
+        const priority = priorities.find(p => p.id === task.priority) || {};
+        const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && task.column !== 'done';
+        
+        cardEl.dataset.taskId = task.id;
+        cardEl.classList.add(...priority.color.split(' '));
+        if (isOverdue) {
+            cardEl.classList.add('ring-2', 'ring-red-300', 'animate-pulse');
+        }
+
+        cardEl.querySelector('.task-category').className += ` ${category.color}`;
+        cardEl.querySelector('.task-category').textContent = `${category.emoji} ${category.label}`;
+        cardEl.querySelector('.task-priority-icon').textContent = priority.icon;
+        
+        cardEl.querySelector('.task-title').textContent = task.title;
+        const descriptionEl = cardEl.querySelector('.task-description');
+        if (task.description) {
+            descriptionEl.textContent = task.description;
+        } else {
+            descriptionEl.remove();
+        }
+
+        const dueDateEl = cardEl.querySelector('.task-due-date');
+        if (task.dueDate) {
+            dueDateEl.querySelector('.due-date-text').textContent = new Date(task.dueDate).toLocaleDateString();
+            if (isOverdue) {
+                dueDateEl.classList.add('text-red-600', 'font-bold');
+                dueDateEl.querySelector('.overdue-indicator').classList.remove('hidden');
+            }
+        } else {
+            dueDateEl.remove();
+        }
+
+        const archiveBtn = cardEl.querySelector('.archive-task-btn');
+        if (task.column !== 'done') {
+            archiveBtn.style.display = 'none';
+        } else {
+             archiveBtn.addEventListener('click', (e) => { e.stopPropagation(); archiveTask(task.id); });
+        }
+
+        // Event Listeners
+        cardEl.addEventListener('dragstart', (e) => {
+            e.dataTransfer.setData('text/plain', task.id);
+            e.target.style.opacity = '0.5';
+        });
+        cardEl.addEventListener('dragend', (e) => e.target.style.opacity = '1');
+        
+        cardEl.querySelector('.task-content-view').addEventListener('click', () => updateTask(task.id, { isEditing: true }));
+        cardEl.querySelector('.edit-task-btn').addEventListener('click', (e) => { e.stopPropagation(); updateTask(task.id, { isEditing: true }); });
+        cardEl.querySelector('.delete-task-btn').addEventListener('click', (e) => { e.stopPropagation(); deleteTask(task.id); });
+        
+        return cardEl;
+    };
+
+    const createTaskEditFormElement = (task) => {
+        const formNode = taskEditFormTemplate.content.cloneNode(true);
+        const formEl = formNode.querySelector('.task-edit-form');
+        const priority = priorities.find(p => p.id === task.priority) || {};
+        formEl.classList.add(...priority.color.split(' '));
+        
+        const titleInput = formEl.querySelector('.edit-title');
+        const descInput = formEl.querySelector('.edit-description');
+        const categorySelect = formEl.querySelector('.edit-category');
+        const prioritySelect = formEl.querySelector('.edit-priority');
+        const dueDateInput = formEl.querySelector('.edit-due-date');
+
+        titleInput.value = task.title;
+        descInput.value = task.description;
+        dueDateInput.value = task.dueDate;
+
+        // Populate selects
+        categories.forEach(cat => {
+            categorySelect.innerHTML += `<option value="${cat.id}">${cat.emoji} ${cat.label}</option>`;
+        });
+        priorities.forEach(pri => {
+            prioritySelect.innerHTML += `<option value="${pri.id}">${pri.icon} ${pri.label}</option>`;
+        });
+        
+        categorySelect.value = task.category;
+        prioritySelect.value = task.priority;
+
+        // Event Listeners
+        formEl.querySelector('.save-task-btn').addEventListener('click', () => {
+            updateTask(task.id, {
+                title: titleInput.value,
+                description: descInput.value,
+                category: categorySelect.value,
+                priority: prioritySelect.value,
+                dueDate: dueDateInput.value,
+                isEditing: false
+            });
+        });
+        
+        formEl.querySelector('.cancel-edit-btn').addEventListener('click', () => updateTask(task.id, { isEditing: false }));
+        formEl.querySelector('.delete-task-btn-edit').addEventListener('click', () => deleteTask(task.id));
+        
+        return formEl;
+    };
+
+    const updateStats = () => {
+        document.getElementById('stats-total').textContent = state.tasks.filter(t => !t.archived).length;
+        document.getElementById('stats-completed').textContent = state.tasks.filter(t => t.column === 'done' && !t.archived).length;
+        document.getElementById('stats-today').textContent = state.tasks.filter(t => t.column === 'today' && !t.archived).length;
+        document.getElementById('stats-archived').textContent = state.tasks.filter(t => t.archived).length;
+    };
+    
+    const updateControls = () => {
+        // Toggle Archived Button
+        const toggleArchivedText = document.getElementById('toggle-archived-text');
+        if (state.showArchived) {
+            toggleArchivedBtn.classList.remove('bg-gray-100', 'text-gray-600', 'hover:bg-gray-200', 'border-gray-200');
+            toggleArchivedBtn.classList.add('bg-purple-100', 'text-purple-700', 'border-purple-200');
+            toggleArchivedText.textContent = 'Hide Archived';
+        } else {
+            toggleArchivedBtn.classList.add('bg-gray-100', 'text-gray-600', 'hover:bg-gray-200', 'border-gray-200');
+            toggleArchivedBtn.classList.remove('bg-purple-100', 'text-purple-700', 'border-purple-200');
+            toggleArchivedText.textContent = 'Show Archived';
+        }
+    };
+    
+    // --- PWA Functionality ---
+
+    const setupPWA = () => {
+        // Add PWA manifest and meta tags
+        const addPWAMeta = () => {
+            const manifest = {
+                name: "Priority Board - Kanban Task Manager",
+                short_name: "Priority Board",
+                description: "Your command center for everything that matters",
+                start_url: "/",
+                display: "standalone",
+                background_color: "#f8fafc",
+                theme_color: "#3b82f6",
+                orientation: "landscape-primary",
+                icons: [{ src: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%233b82f6'/%3E%3Ctext y='70' font-size='60' text-anchor='middle' x='50' fill='white'%3E📋%3C/text%3E%3C/svg%3E", sizes: "192x192", type: "image/svg+xml" }, { src: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%233b82f6'/%3E%3Ctext y='70' font-size='60' text-anchor='middle' x='50' fill='white'%3E📋%3C/text%3E%3C/svg%3E", sizes: "512x512", type: "image/svg+xml" }]
+            };
+            const manifestBlob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
+            const manifestURL = URL.createObjectURL(manifestBlob);
+            const link = document.createElement('link');
+            link.rel = 'manifest';
+            link.href = manifestURL;
+            document.head.appendChild(link);
+            document.querySelector('meta[name="theme-color"]')?.setAttribute('content', '#3b82f6');
+        };
+
+        // Service Worker Registration
+        const registerSW = async () => {
+            if ('serviceWorker' in navigator) {
+                try {
+                    const swCode = `
+                        const CACHE_NAME = 'priority-board-v1';
+                        const urlsToCache = ['/', '/index.html'];
+                        self.addEventListener('install', e => e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(urlsToCache))));
+                        self.addEventListener('fetch', e => e.respondWith(caches.match(e.request).then(r => r || fetch(e.request))));
+                    `;
+                    const swBlob = new Blob([swCode], { type: 'application/javascript' });
+                    await navigator.serviceWorker.register(URL.createObjectURL(swBlob));
+                    console.log('Service Worker registered successfully');
+                } catch (error) {
+                    console.log('Service Worker registration failed:', error);
+                }
+            }
+        };
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            state.deferredPrompt = e;
+            installPwaBtn.classList.remove('hidden');
+        });
+
+        addPWAMeta();
+        registerSW();
+    };
+
+    // --- INITIALIZATION ---
+
+    const init = () => {
+        // Setup control event listeners
+        searchInput.addEventListener('input', (e) => {
+            state.searchTerm = e.target.value;
+            render();
+        });
+
+        filterCategorySelect.addEventListener('change', (e) => {
+            state.filterCategory = e.target.value;
+            render();
+        });
+        
+        filterPrioritySelect.addEventListener('change', (e) => {
+            state.filterPriority = e.target.value;
+            render();
+        });
+
+        toggleArchivedBtn.addEventListener('click', () => {
+            state.showArchived = !state.showArchived;
+            render();
+        });
+
+        installPwaBtn.addEventListener('click', async () => {
+            if (state.deferredPrompt) {
+                state.deferredPrompt.prompt();
+                const { outcome } = await state.deferredPrompt.userChoice;
+                if (outcome === 'accepted') {
+                    installPwaBtn.classList.add('hidden');
+                }
+                state.deferredPrompt = null;
+            }
+        });
+
+        // Populate filter dropdowns
+        filterCategorySelect.innerHTML = `<option value="all">🌟 All Categories</option>` + 
+            categories.map(c => `<option value="${c.id}">${c.emoji} ${c.label}</option>`).join('');
+            
+        filterPrioritySelect.innerHTML = `<option value="all">⚡ All Priorities</option>` +
+            priorities.map(p => `<option value="${p.id}">${p.icon} ${p.label}</option>`).join('');
+
+        // Load data, set up PWA, and do the initial render
+        loadTasks();
+        setupPWA();
+        render();
+    };
+
+    init();
+});
+</script>
+
+</body>
+</html>
